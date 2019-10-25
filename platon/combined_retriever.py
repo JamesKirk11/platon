@@ -18,7 +18,7 @@ from .fit_info import FitInfo
 from .constants import METRES_TO_UM, M_jup, R_jup, R_sun
 from ._params import _UniformParam
 from .errors import AtmosphereError
-from ._output_writer import write_param_estimates_file
+# from ._output_writer import write_param_estimates_file
 from .TP_profile import Profile
 
 class CombinedRetriever:
@@ -127,16 +127,30 @@ class CombinedRetriever:
             if measured_transit_depths is not None:
                 if T is None:
                     raise ValueError("Must fit for T if using transit depths")
-                
+
                 #CHIMA. To add the N number of offset terms to the transit_calc function
-                TranCalStr ="transit_wavelengths, calculated_transit_depths, info_dict = transit_calc.compute_depths("
-                TranCalStr +="Rs, Mp, Rp, T, logZ=logZ,CO_ratio=CO_ratio,scattering_factor=scatt_factor, scattering_slope=scatt_slope,"
-                TranCalStr +="cloudtop_pressure=cloudtop_P, T_star=T_star,T_spot=T_spot, spot_cov_frac=spot_cov_frac,frac_scale_height"
-                TranCalStr +="=frac_scale_height, number_density=number_density,part_size=part_size, ri=ri, full_output=True, InstNum = InstNum"
+                transit_cal_kwargs = {
+                    "logZ": logZ,
+                    "CO_ratio": CO_ratio,
+                    "scattering_factor": scatt_factor,
+                    "scattering_slope": scatt_slope,
+                    "cloudtop_pressure": cloudtop_P,
+                    "T_star": T_star,
+                    "T_spot": T_spot,
+                    "spot_cov_frac": spot_cov_frac,
+                    "frac_scale_height": frac_scale_height,
+                    "number_density": number_density,
+                    "part_size": part_size,
+                    "ri": ri,
+                    "full_output": True,
+                    "InstNum": InstNum,
+                }
                 if InstNum:
-                    for o in range(InstNum): 
-                        TranCalStr += ", Offset"+str(o+1)+"=Offset"+str(o+1)+",Offset"+str(o+1)+"_Wavs=Offset"+str(o+1)+"_Wavs"
-                exec(TranCalStr+")")
+                    for o in range(InstNum):
+                        transit_cal_kwargs["Offset"+str(o+1)] = params_dict["Offset"+str(o+1)]
+                        transit_cal_kwargs["Offset"+str(o+1)+"_Wavs"] = params_dict["Offset"+str(o+1)"_Wavs"]
+
+                transit_wavelengths, calculated_transit_depths, info_dict = transit_calc.compute_depths(Rs, Mp, Rp, T, **transit_cal_kwargs)
                 residuals = calculated_transit_depths - measured_transit_depths
                 scaled_errors = error_multiple * measured_transit_errors
                 ln_likelihood += -0.5 * np.sum(residuals**2 / scaled_errors**2 + np.log(2 * np.pi * scaled_errors**2))
@@ -278,11 +292,11 @@ class CombinedRetriever:
         best_params_arr = sampler.flatchain[np.argmax(
             sampler.flatlnprobability)]
         
-        write_param_estimates_file(
-            sampler.flatchain,
-            best_params_arr,
-            np.max(sampler.flatlnprobability),
-            fit_info.fit_param_names)
+        # write_param_estimates_file(
+        #     sampler.flatchain,
+        #     best_params_arr,
+        #     np.max(sampler.flatlnprobability),
+        #     fit_info.fit_param_names)
 
         if plot_best:
              self._ln_prob(best_params_arr, transit_calc, eclipse_calc, fit_info,
@@ -375,11 +389,11 @@ class CombinedRetriever:
         normalized_weights = np.exp(result.logwt)/np.sum(np.exp(result.logwt))
         result.weights = normalized_weights
         
-        write_param_estimates_file(
-            dynesty.utils.resample_equal(result.samples, normalized_weights),
-            best_params_arr,
-            np.max(result.logp),
-            fit_info.fit_param_names)
+        # write_param_estimates_file(
+        #     dynesty.utils.resample_equal(result.samples, normalized_weights),
+        #     best_params_arr,
+        #     np.max(result.logp),
+        #     fit_info.fit_param_names)
 
         if plot_best:
             self._ln_prob(best_params_arr, transit_calc, eclipse_calc, fit_info,
